@@ -1,0 +1,2 @@
+Date     Start    Stop     Activity    Comments
+16/09    10pm     12am     Coding      Spec analysis+getting started: Structure of subset 0 commands done       
