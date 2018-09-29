@@ -16,7 +16,7 @@ if (scalar @ARGV == 0)
     if (not -d ".legit") 
     {
     
-        print "legit.pl: error: no .legit directory containing legit repository exists\n";
+        print STDERR "legit.pl: error: no .legit directory containing legit repository exists\n" and exit 1;
     
     } else 
     {
@@ -35,9 +35,7 @@ if (scalar @ARGV == 0)
         print "adding files now\n";
         foreach my $i (1..$#ARGV) {
             open F, "<", $ARGV[$i] or die;
-            while ($line = <F>) {
-                push @arr, $line;
-            }
+            @arr = <F>;
             close F;
             open F, ">", ".legit/index/$ARGV[$i]" or die;
             while (scalar @arr > 0) {
@@ -51,10 +49,34 @@ if (scalar @ARGV == 0)
 } elsif ($ARGV[0] eq "commit") 
 {
     # Save copy of all files in index to the repo
-    ($#ARGV > 1) or print STDERR "usage: legit.pl commit [-a] -m commit-message\n";
+    ($#ARGV > 1) or print STDERR "usage: legit.pl commit [-a] -m commit-message\n" and exit 1;
+    $m = 1;
+    while ($ARGV[$m] ne "-m") {
+        $m++; 
+    }
+    # check if message exists. Assume that the message is ascii and doesn't start with a '-'
+    $#ARGV > $m and substr($ARGV[$m+1], 0, 1) ne "-" or print STDERR "usage: legit.pl commit [-a] -m commit-message\n" and exit 1;
     $i = 1;
-    while ($ARGV[$i] ne "-m") {
-        $i++; 
+    $update_index = 0;
+    while ($i <= $#ARGV) {
+        $ARGV[$i] eq "-a" and $update_index = 1 and last;
+        $i++;    
+    }
+    if ($update_index) 
+    {
+        foreach $index_file (glob ".legit/index/*") {
+            $index_file =~ m/^\.legit\/index\/(.+)$/g;
+            $file = $1;
+            open F, "<", $file or die;
+            @arr = <F>;
+            close F;
+            open F, ">", "$index_file" or die;
+            while (scalar @arr > 0) {
+                $line = shift @arr;
+                print F "$line";
+            }
+            close F;
+        }
     }
     $commit = 1; # Assume we do need to commit
     $commit_no = 0;
@@ -63,11 +85,12 @@ if (scalar @ARGV == 0)
         $commit_no++;
         $commit_dir = ".legit/commit.$commit_no";
     }
-    $commit_message = $ARGV[$i+1];
+    $commit_message = $ARGV[$m+1];
     print "Commit message is $commit_message\n";
     # Save a copy of all files in the index to the repo or print "nothing to commit" if index hasn't changed compared to prev commit
     if ($commit_no > 0) 
     {
+            print "file is $file\n";
         $commit = 0;
         $prev_commit_no = $commit_no-1;
         print "prev commit no $prev_commit_no\n";
@@ -75,7 +98,7 @@ if (scalar @ARGV == 0)
             print "Checking";
             $index_file =~ m/^\.legit\/index\/(.+)$/g;
             $file = $1;
-            printf "file is $file\n";
+            # TODO account for remove here
             if (not -e ".legit/commit.$prev_commit_no/$file") {
                 $commit = 1;
             } elsif (compare_files("$index_file", ".legit/commit.$prev_commit_no/$file")) {
@@ -86,7 +109,6 @@ if (scalar @ARGV == 0)
         }
         open $log, ">>", ".legit/log.txt" or die;
     } else {
-        print "Creating log.txt\n";
         open $log, ">", ".legit/log.txt" or die;
     }
     if ( $commit ) {
@@ -153,8 +175,9 @@ if (scalar @ARGV == 0)
     while ( $line = <F> ) {
         print "$line";
     }
-
-    
+} elsif ($ARGV[0] eq "rm") 
+{
+        
 
 } else 
 {
