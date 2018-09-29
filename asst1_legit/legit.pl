@@ -62,7 +62,8 @@ if (scalar @ARGV == 0)
         $commit_no++;
         $commit_dir = ".legit/commit.$commit_no";
     }
-    #$commit_message = $ARGV[$i];
+    $commit_message = $ARGV[$i];
+    print "Commit message is $commit_message\n";
     # Save a copy of all files in the index to the repo or print "nothing to commit" if index hasn't changed compared to prev commit
     if ($commit_no > 0) 
     {
@@ -112,12 +113,40 @@ if (scalar @ARGV == 0)
 
 } elsif ($ARGV[0] eq "show") 
 {
+    # first check if any commits exist --> enough to check if .legit/commit.0 exists
+    -d ".legit/commit.0" or print STDERR "legit.pl: error: your repository does not have any commits yet\n" and exit;
+    # print file contents from commit or index
+    ($#ARGV > 0) or print STDERR "usage: legit.pl show <commit>:<filename>\n" and exit;
+    if ( $ARGV[1] =~ m/^(\d+):(.+)$/g ) 
+    {
+        $commit = $1;
+        print "Looking at commit $commit\n";
+        $path = ".legit/commit.$commit";
+        $filename = $2;
+    } elsif ( $ARGV[1] =~ m/:(.+)$/g ) 
+    {
+        $path = ".legit/index";
+        $filename = $1;
+    } else {
+        print STDERR "legit.pl: error: invalid filename''" and exit;
+    }
+    # Check if path exists
+    -d $path or print STDERR "legit.pl: error: unknown commit '$commit'\n" and exit;
+    $path = "$path/$filename";
+    # Check if the file actually exists
+    -e $path or print STDERR "legit.pl: error: '$filename' not found in commit $commit\n" and exit;
+    # Print the file to stdout
+    open F, "<", "$path" or die;
+    while ( $line = <F> ) {
+        print "$line";
+    }
 
+    
 
 } else 
 {
     print STDERR "legit.pl: error: unknown command $ARGV[0]\n";
-    print_usage();
+    print_usage() and exit;
 }
 
 
