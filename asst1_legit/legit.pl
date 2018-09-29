@@ -79,18 +79,12 @@ if (scalar @ARGV == 0)
         }
     }
     $commit = 1; # Assume we do need to commit
-    $commit_no = 0;
-    $commit_dir = ".legit/commit.$commit_no";
-    if (-e $commit_dir) {
-        $commit_no++;
-        $commit_dir = ".legit/commit.$commit_no";
-    }
+    $commit_no = next_commit_num();
     $commit_message = $ARGV[$m+1];
-    print "Commit message is $commit_message\n";
+    print "Commit $commit_no message is $commit_message\n";
     # Save a copy of all files in the index to the repo or print "nothing to commit" if index hasn't changed compared to prev commit
     if ($commit_no > 0) 
     {
-            print "file is $file\n";
         $commit = 0;
         $prev_commit_no = $commit_no-1;
         print "prev commit no $prev_commit_no\n";
@@ -112,6 +106,7 @@ if (scalar @ARGV == 0)
         open $log, ">", ".legit/log.txt" or die;
     }
     if ( $commit ) {
+        $commit_dir = ".legit/commit.$commit_no";
         printf("its time to COMMIT\n");
         mkdir "$commit_dir" or die;
         foreach $index_file (glob ".legit/index/*") {
@@ -176,7 +171,41 @@ if (scalar @ARGV == 0)
         print "$line";
     }
 } elsif ($ARGV[0] eq "rm") 
-{
+{ 
+    ($#ARGV > 1) or print STDERR "usage: legit.pl rm [--force] [--cached] filenames\n" and exit 1;
+    $i = 1;
+    $is_forced = 0;
+    $is_cached = 0;
+    while ($i <= $#ARGV) 
+    {
+        $ARGV[$i] eq "--force" and $is_forced = 1;
+        $ARGV[$i] eq "--cached" and $is_cached = 1;
+    }
+    # first check if all named files are in the repo (latest commit)
+    $curr_commit = next_commit_num() - 1;
+    $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet" and exit 1;
+    $commit_dir = ".legit/commit.$curr_commit";
+    $i = 2;
+    while ($i <= $#ARGV) {
+        if (substr($ARGV[$i], 0, 1) ne "-")
+        {
+            -e "$commit_dir/$ARGV[$i]" or print STDERR "legit.pl: error: '$ARGV[$i]' is not in the legit repository\n" and exit 1;
+            push @files, $ARGV[$i];
+        }
+        $i++;
+    }
+    if (not $is_forced) {
+        foreach $file (@files) {
+            # Check if file in CWD is different to file in latest commit
+            if (not $is_cached) 
+            {
+                
+
+            }
+            # Check if file in index is different to file in latest commit
+        }
+    }
+
         
 
 } else 
@@ -214,4 +243,14 @@ sub compare_files {
         return 1;
     }
     return 0;
+}
+
+sub next_commit_num {
+    my $commit_no = 0;
+    my $commit_dir = ".legit/commit.$commit_no";
+    if (-e $commit_dir) {
+        $commit_no++;
+        $commit_dir = ".legit/commit.$commit_no";
+    }
+    return $commit_no;
 }
