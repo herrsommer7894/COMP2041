@@ -194,18 +194,14 @@ if (scalar @ARGV == 0)
         $i++;
     }
     if (not $is_forced) {
-        print "not forced\n";
         foreach $file (@files) {
             # Check if file in CWD to be deleted is different to file in latest commit
             if (not $is_cached) 
             {
                 if (-e $file) {
-                    print "here\n";
                     compare_files($file, ".legit/index/$file") and print STDERR "legit.pl: error: '$file' in repository is different to working file\n" and exit 1;
-                    print "which\n";
                     #$test2 = compare_files(".legit/index/$file", $file);
                     $test2 = 0;
-                    print "one\n";
                 } else { 
                     $test2 = 1;
                 }
@@ -244,19 +240,25 @@ sub print_usage {
 
 sub compare_files {
     my ( $file1, $file2 ) = @_;
-    open my $F1, "<", $file1 or die;
-    open my $F2, "<", $file2 or die;
 
-    while ( defined(my $line1 = <$F1>) ) {
-        if ( $line1 eq <$F2> ) {
-            next;
-        }
-        close $F1;
-        close $F2;
-        return 1;
-    }
+    open my $F1, "<", $file1 or die;    
+    my @arr1 = <$F1>;
     close $F1;
+    open my $F2, "<", $file2 or die;
+    my @arr2 = <$F2>;
     close $F2;
+
+    foreach my $elem1 (@arr1) {
+        #print "$elem1";
+        if (scalar @arr2 > 0) {
+            $elem2 = shift @arr2;
+            # print "$elem2";
+            $elem1 eq $elem2 and next;
+        } else {
+            return 1;
+        }
+    }
+
     return 0;
 }
 
