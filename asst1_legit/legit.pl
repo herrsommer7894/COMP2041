@@ -215,6 +215,91 @@ if (scalar @ARGV == 0)
             }
         }
     }
+} elsif ($ARGV[0] eq "status") {
+    # "file changed, Staged for commit" if in index and CWD is different to latest commit
+    # "file changed, different changed staged for commit" if index, CWD and latest commit different
+    # "File changes, changed not staged for commit if CWD diff to index and commit, index and commit same
+    # "Added to index" if CWD == Index and doesnt exist in latest commit
+    # "untracked' if exists in neither index nor commit
+    # "same as repo" if everythings the same
+    # "file deleted" if only deleted from CWD
+    # "deleted" if deleted from index and CWD
+    $curr_commit = next_commit_num() - 1;
+    $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet\n" and exit 1;
+    $commit_dir = ".legit/commit.$curr_commit";
+    $index_dir = ".legit/index/";
+    # Collate all unique files from index, CWD and repo
+    foreach $file (glob "*") {
+        $files{$file} = 1;
+    }
+    foreach $file (glob "$commit_dir/*") {
+        $file =~ m/^\.legit\/commit.$curr_commit\/(.+)$/g;
+        $file = $1;
+        $file =~ s/\///g;
+        if (not exists $files{$file}) {
+            $files{$file} = 1;
+        }
+    }  
+    foreach $file (glob "$index_dir/*") {
+        $file =~ m/^\.legit\/index\/(.+)$/g;
+        $file = $1;
+        $file =~ s/\///g;
+        if (not exists $files{$file}) {
+            $files{$file} = 1;
+        }
+    }
+    foreach $file (sort keys %files) {
+        # file deleted
+        if (not -e "$file") 
+        {
+            print "$file - file deleted\n";
+
+        # untracked
+        } elsif (not -e "$index_dir/$file" and not -e "$commit_dir/$file")
+        {
+            print "$file - untracked\n";
+        
+        # same as repo
+        } elsif (compare("$index_dir/$file", "$file") == 0 and compare("$file", "commit_dir/$file") == 0) 
+        {
+            print "$file - same as repo\n";
+
+        # added to index
+        } elsif (not -e "$commit_dir/$file" and compare($file, "$index_dir/$file") == 0) 
+        {
+            print "$file - added to index\n";
+        
+        # deleted
+        } elsif (not -e "$index_dir/$file" and not -e "$file") 
+        {
+            print "$file - deleted\n";
+
+        
+        # changes not staged for commit
+        } elsif (compare("$index_dir/$file","$commit_dir/$file") == 0 and 
+                 compare("$file","$commit_dir/$file") and
+                 compare("$index_dir/$file","$file") ) 
+        {
+            print "$file - file changed, changes not staged for commit\n";
+        
+        # changed staged for commit 
+        } elsif (compare("$index_dir/$file","$commit_dir/$file") and 
+                 compare("$index_dir/$file","$file") == 0) 
+        {
+            print "$file - file changed, changes staged for commit\n";
+        
+        # different changes staged for commit
+        } elsif (compare("$index_dir/$file","$commit_dir/$file") and 
+                 compare("$file","$commit_dir/$file") and
+                 compare("$index_dir/$file","$file") ) 
+        {
+            print "$file - file changed, different changes staged for commit\n";
+        }
+
+    }
+
+
+
 } else 
 {
     print STDERR "legit.pl: error: unknown command $ARGV[0]\n";
@@ -241,10 +326,10 @@ sub print_usage {
 sub compare_files {
     my ( $file1, $file2 ) = @_;
 
-    open my $F1, "<", $file1 or die;    
+    open my $F1, "<", $file1 or return 1;    
     my @arr1 = <$F1>;
     close $F1;
-    open my $F2, "<", $file2 or die;
+    open my $F2, "<", $file2 or return 1;
     my @arr2 = <$F2>;
     close $F2;
 
