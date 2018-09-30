@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-
-
 if (scalar @ARGV == 0) 
 {
     print_usage();
@@ -81,7 +79,7 @@ if (scalar @ARGV == 0)
     $commit = 1; # Assume we do need to commit
     $commit_no = next_commit_num();
     $commit_message = $ARGV[$m+1];
-    print "Commit $commit_no message is $commit_message\n";
+    #print "Commit $commit_no message is $commit_message\n";
     # Save a copy of all files in the index to the repo or print "nothing to commit" if index hasn't changed compared to prev commit
     if ($commit_no > 0) 
     {
@@ -89,7 +87,6 @@ if (scalar @ARGV == 0)
         $prev_commit_no = $commit_no-1;
         print "prev commit no $prev_commit_no\n";
         foreach $index_file (glob ".legit/index/*") {
-            print "Checking";
             $index_file =~ m/^\.legit\/index\/(.+)$/g;
             $file = $1;
             # TODO account for remove here
@@ -107,7 +104,7 @@ if (scalar @ARGV == 0)
     }
     if ( $commit ) {
         $commit_dir = ".legit/commit.$commit_no";
-        printf("its time to COMMIT\n");
+        #printf("its time to COMMIT\n");
         mkdir "$commit_dir" or die;
         foreach $index_file (glob ".legit/index/*") {
             $index_file =~ m/^\.legit\/index\/(.+)$/g;
@@ -126,6 +123,7 @@ if (scalar @ARGV == 0)
             $commit=0;
         }
         print $log "$commit_no $commit_message\n";
+        print "Commited as commit $commit_no\n";
     } else {
         print STDERR "Nothing to commit\n";
     }
@@ -172,7 +170,7 @@ if (scalar @ARGV == 0)
     }
 } elsif ($ARGV[0] eq "rm") 
 { 
-    ($#ARGV > 1) or print STDERR "usage: legit.pl rm [--force] [--cached] filenames\n" and exit 1;
+    ($#ARGV > 0) or print STDERR "usage: legit.pl rm [--force] [--cached] filenames\n" and exit 1;
     $i = 1;
     $is_forced = 0;
     $is_cached = 0;
@@ -180,12 +178,13 @@ if (scalar @ARGV == 0)
     {
         $ARGV[$i] eq "--force" and $is_forced = 1;
         $ARGV[$i] eq "--cached" and $is_cached = 1;
+        $i++;
     }
     # first check if all named files are in the repo (latest commit)
     $curr_commit = next_commit_num() - 1;
-    $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet" and exit 1;
+    $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet\n" and exit 1;
     $commit_dir = ".legit/commit.$curr_commit";
-    $i = 2;
+    $i = 1;
     while ($i <= $#ARGV) {
         if (substr($ARGV[$i], 0, 1) ne "-")
         {
@@ -195,19 +194,31 @@ if (scalar @ARGV == 0)
         $i++;
     }
     if (not $is_forced) {
+        print "not forced\n";
         foreach $file (@files) {
-            # Check if file in CWD is different to file in latest commit
+            # Check if file in CWD to be deleted is different to file in latest commit
             if (not $is_cached) 
             {
-                
-
+                if (-e $file) {
+                    print "here\n";
+                    compare_files($file, ".legit/index/$file") and print STDERR "legit.pl: error: '$file' in repository is different to working file\n" and exit 1;
+                    print "which\n";
+                    #$test2 = compare_files(".legit/index/$file", $file);
+                    $test2 = 0;
+                    print "one\n";
+                } else { 
+                    $test2 = 1;
+                }
             }
             # Check if file in index is different to file in latest commit
+            $test1 = compare_files(".legit/index/$file", "$commit_dir/$file");
+            if ($test1 and $test2) {
+                print STDERR "legit.pl: error: '$file' in index is different to both working file and repository\n" and exit 1; 
+            } elsif ($test1) {
+                print STDERR "legit.pl: error: '$file' has changed staged in the index\n" and exit 1;
+            }
         }
     }
-
-        
-
 } else 
 {
     print STDERR "legit.pl: error: unknown command $ARGV[0]\n";
@@ -236,12 +247,16 @@ sub compare_files {
     open my $F1, "<", $file1 or die;
     open my $F2, "<", $file2 or die;
 
-    while ( my $line1 = <$F1> ) {
+    while ( defined(my $line1 = <$F1>) ) {
         if ( $line1 eq <$F2> ) {
             next;
         }
+        close $F1;
+        close $F2;
         return 1;
     }
+    close $F1;
+    close $F2;
     return 0;
 }
 
