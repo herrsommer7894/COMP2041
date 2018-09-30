@@ -260,7 +260,8 @@ if (scalar @ARGV == 0)
             print "$file - untracked\n";
         
         # same as repo
-        } elsif (compare("$index_dir/$file", "$file") == 0 and compare("$file", "commit_dir/$file") == 0) 
+        } elsif (compare_files("$index_dir/$file", "$file") == 0 and 
+                 compare_files("$file", "commit_dir/$file") == 0) 
         {
             print "$file - same as repo\n";
 
@@ -276,29 +277,27 @@ if (scalar @ARGV == 0)
 
         
         # changes not staged for commit
-        } elsif (compare("$index_dir/$file","$commit_dir/$file") == 0 and 
-                 compare("$file","$commit_dir/$file") and
-                 compare("$index_dir/$file","$file") ) 
+        } elsif (compare_files("$index_dir/$file","$commit_dir/$file") == 0 and 
+                 compare_files("$file","$commit_dir/$file") and
+                 compare_files("$index_dir/$file","$file") ) 
         {
             print "$file - file changed, changes not staged for commit\n";
         
         # changed staged for commit 
-        } elsif (compare("$index_dir/$file","$commit_dir/$file") and 
-                 compare("$index_dir/$file","$file") == 0) 
+        } elsif (compare_files("$index_dir/$file","$commit_dir/$file") and 
+                 compare_files("$index_dir/$file","$file") == 0) 
         {
             print "$file - file changed, changes staged for commit\n";
         
         # different changes staged for commit
-        } elsif (compare("$index_dir/$file","$commit_dir/$file") and 
-                 compare("$file","$commit_dir/$file") and
-                 compare("$index_dir/$file","$file") ) 
+        } elsif (compare_files("$index_dir/$file","$commit_dir/$file") and 
+                 compare_files("$file","$commit_dir/$file") and
+                 compare_files("$index_dir/$file","$file") ) 
         {
             print "$file - file changed, different changes staged for commit\n";
         }
 
     }
-
-
 
 } else 
 {
