@@ -8,4 +8,4 @@ Date     Start    Stop     Activity    Comments
 30/09    8pm      12am     Coding      legit remove done
 1/10     12am     3am      Coding      legit status draft 
 1/10     4pm      6pm      Debugging   legit status deletion not working, problem with compare function
-
+1/10     6pm      8pm      Coding      re-implemented rm error checking

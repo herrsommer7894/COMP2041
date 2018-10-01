@@ -29,13 +29,18 @@ elsif ($ARGV[0] eq "add")
         {
             $ARGV[$i] =~ m/\-\-\-/g and print STDERR "usage: legit.pl add <filenames>\n" and exit 1;
             $ARGV[$i] =~ m/^[a-zA-Z0-9][a-zA-z0-9\.\-\_]*$/g or print STDERR "legit.pl: error: invalid filename '$ARGV[$i]'\n" and exit 1;
-            if (not -e $ARGV[$i]) 
+            if (not -e $ARGV[$i] and not -e ".legit/index/$ARGV[$i]") 
             {
                 print "legit.pl: error: can not open '$ARGV[$i]'\n" and exit 1;
             }
         }
         foreach my $i (1..$#ARGV) 
         {
+            if (not -e $ARGV[$i] and -e ".legit/index/$ARGV[$i]") 
+            {
+                unlink ".legit/index/$ARGV[$i]";
+                next;
+            }
             open F, "<", $ARGV[$i] or die;
             @arr = <F>;
             close F;
@@ -90,7 +95,7 @@ elsif ($ARGV[0] eq "commit")
     $commit_no = next_commit_num();
     $commit_message = $ARGV[$m+1];
     #print "Commit $commit_no message is $commit_message\n";
-    # Save a copy of all files in the index to the repo or print "nothing to commit" if index hasn't changed compared to prev commit
+    # Save a copy of all files in the index to the repo or print "Nothing to commit" if index hasn't changed compared to prev commit
     if ($commit_no > 0) 
     {
         $commit = 0;
@@ -99,15 +104,24 @@ elsif ($ARGV[0] eq "commit")
         {
             $index_file =~ m/^\.legit\/index\/(.+)$/g;
             $file = $1;
-            # TODO account for remove here
-            if (not -e ".legit/commit.$prev_commit_no/$file") 
-            {
-                $commit = 1;
-            } 
-            elsif (compare_files("$index_file", ".legit/commit.$prev_commit_no/$file")) 
+            if (compare_files("$index_file", ".legit/commit.$prev_commit_no/$file")) 
             {
                 $commit = 1;
                 last;
+            }
+        }
+        # account for removed files here
+        if ($commit == 0) 
+        {
+            foreach $commit_file (glob ".legit/commit.$prev_commit_no/*") 
+            {
+                $commit_file =~ m/^\.legit\/commit.$prev_commit_no\/(.+)$/g;
+                $file = $1;
+                if (not -e ".legit/index/$file") 
+                {
+                    $commit = 1;
+                    last
+                } 
             }
         }
         open $log, ">>", ".legit/log.txt" or die;
@@ -120,7 +134,7 @@ elsif ($ARGV[0] eq "commit")
     {
         $commit_dir = ".legit/commit.$commit_no";
         #printf("its time to COMMIT\n");
-        mkdir "$commit_dir" or die;
+        mkdir "$commit_dir" or die "$commit_dir\n";
         foreach $index_file (glob ".legit/index/*") 
         {
             $index_file =~ m/^\.legit\/index\/(.+)$/g;
@@ -141,10 +155,10 @@ elsif ($ARGV[0] eq "commit")
             $commit=0;
         }
         print $log "$commit_no $commit_message\n";
-        print "Commited as commit $commit_no\n";
+        print "Committed as commit $commit_no\n";
     } else 
     {
-        print STDERR "Nothing to commit\n";
+        print STDERR "nothing to commit\n";
     }
     close $log;
 
@@ -169,22 +183,25 @@ elsif ($ARGV[0] eq "commit")
     {
         $commit = $1;
         $path = ".legit/commit.$commit";
+        # Check if path exists
+        -d $path or print STDERR "legit.pl: error: unknown commit '$commit'\n" and exit 1;
         $filename = $2;
+        $path = "$path/$filename";
+        # Check if the file actually exists
+        -e $path or print STDERR "legit.pl: error: '$filename' not found in commit $commit\n" and exit 1;
     } 
     elsif ( $ARGV[1] =~ m/:(.+)$/g ) 
     {
         $path = ".legit/index";
         $filename = $1;
+        $path = "$path/$filename";
+        # Check if the file actually exists
+        -e $path or print STDERR "legit.pl: error: '$filename' not found in index\n" and exit 1;
     } 
     else 
     {
         print STDERR "legit.pl: error: invalid filename''" and exit 1;
     }
-    # Check if path exists
-    -d $path or print STDERR "legit.pl: error: unknown commit '$commit'\n" and exit 1;
-    $path = "$path/$filename";
-    # Check if the file actually exists
-    -e $path or print STDERR "legit.pl: error: '$filename' not found in commit $commit\n" and exit 1;
     # Print the file to stdout
     open F, "<", "$path" or die;
     while ( $line = <F> ) 
@@ -208,11 +225,12 @@ elsif ($ARGV[0] eq "rm")
     $curr_commit = next_commit_num() - 1;
     $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet\n" and exit 1;
     $commit_dir = ".legit/commit.$curr_commit";
+    $index_dir = ".legit/index";
     $i = 1;
     while ($i <= $#ARGV) {
         if (substr($ARGV[$i], 0, 1) ne "-")
         {
-            -e "$commit_dir/$ARGV[$i]" or print STDERR "legit.pl: error: '$ARGV[$i]' is not in the legit repository\n" and exit 1;
+            -e "$index_dir/$ARGV[$i]" or print STDERR "legit.pl: error: '$ARGV[$i]' is not in the legit repository\n" and exit 1;
             push @files, $ARGV[$i];
         }
         $i++;
@@ -221,29 +239,22 @@ elsif ($ARGV[0] eq "rm")
     {
         foreach $file (@files) 
         {
-            # Check if file in CWD to be deleted is different to file in latest commit
-            if (not $is_cached) 
-            {
-                if (-e $file) 
-                {
-                    compare_files($file, ".legit/index/$file") and print STDERR "legit.pl: error: '$file' in repository is different to working file\n" and exit 1;
-                    #$test2 = compare_files(".legit/index/$file", $file);
-                    $test2 = 0;
-                } 
-                else 
-                { 
-                    $test2 = 1;
-                }
-            }
-            # Check if file in index is different to file in latest commit
-            $test1 = compare_files(".legit/index/$file", "$commit_dir/$file");
-            if ($test1 and $test2) 
+            $test1 = compare_files("$file", "$index_dir/$file");
+            $test2 = compare_files("$index_dir/$file", "$commit_dir/$file");
+            $test3 = compare_files("$file", "$commit_dir/$file");
+            # Index file different to both CWD and repo
+            if ( $test1 and $test2 )
             {
                 print STDERR "legit.pl: error: '$file' in index is different to both working file and repository\n" and exit 1; 
             } 
-            elsif ($test1) 
+            elsif ( not $test1 and $test2 and not $is_cached ) 
             {
-                print STDERR "legit.pl: error: '$file' has changed staged in the index\n" and exit 1;
+                print STDERR "legit.pl: error: '$file' has changes staged in the index\n" and exit 1;
+            }
+            # CWD file different to latest commit
+            elsif( $test3 and not $is_cached ) 
+            {
+                print STDERR "legit.pl: error: '$file' in repository is different to working file\n" and exit 1;
             }
         }
     }
@@ -254,7 +265,7 @@ elsif ($ARGV[0] eq "rm")
         {
             -e "$file" and unlink "$file";
         }
-        -e ".legit/index/$file" and unlink ".legit/index/$file";
+        -e "$index_dir/$file" and unlink "$index_dir/$file";
     }
 
 
@@ -315,14 +326,14 @@ elsif ($ARGV[0] eq "status")
 
         } 
         # untracked
-        elsif ( not -e "$index_dir/$file" and not -e "$commit_dir/$file" )
+        elsif ( not -e "$index_dir/$file" )
         {
             print "$file - untracked\n";
         
         } 
         # same as repo
         elsif (compare_files("$index_dir/$file", "$file") == 0 and 
-                 compare_files("$file", "commit_dir/$file") == 0) 
+                 compare_files("$file", "$commit_dir/$file") == 0) 
         {
             print "$file - same as repo\n";
 
@@ -416,7 +427,7 @@ sub next_commit_num
 {
     my $commit_no = 0;
     my $commit_dir = ".legit/commit.$commit_no";
-    if (-e $commit_dir) 
+    while (-d $commit_dir) 
     {
         $commit_no++;
         $commit_dir = ".legit/commit.$commit_no";
