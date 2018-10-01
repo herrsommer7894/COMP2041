@@ -456,20 +456,24 @@ elsif ($ARGV[0] eq "branch")
         $file =~ /^\.legit\/(.+)\.branch$/ and
         $curr_branch = $1 and last;
     }
-    print "$curr_branch\n";
+    #print "curr branch $curr_branch\n";
+    $curr_branch eq $branch_name and print "Already on '$branch_name'\n" and exit;
     copy_state( ".legit", ".legit/branch.$curr_branch" );
     # Switch to new branch
     unlink ".legit/$curr_branch.branch";
-    open F, ">", "$branch_name.branch";
+    open F, ">", ".legit/$branch_name.branch";
     close F;
     # remove everything from .legit and replace it with appropriate branch
-    $i = 0;
-    while ( $i < next_commit_num() ) 
+    $m = 0;
+    $commit = next_commit_num();
+    while ( $m < $commit )  # nts: won't work if you put next_commit_num in here...
     {
-        rmtree(".legit/commit.$i");
+        rmtree(".legit/commit.$m");
+        $m++;
     }
     unlink ".legit/log.txt";
     rmtree(".legit/index");
+    #print "copying from $branch_dir to .legit\n";
     copy_state("$branch_dir", ".legit");
     print "Switched to branch '$branch_name'\n";
 
@@ -545,8 +549,16 @@ sub copy_state
 {
     my ($from, $to) = @_;
 
-    $i = 0;
-    while ( $i < next_commit_num() ) 
+    my $i = 0;
+
+    my $commit_no = 0;
+    my $commit_dir = "$from/commit.$commit_no";
+    while (-d $commit_dir) 
+    {
+        $commit_no++;
+        $commit_dir = "$from/commit.$commit_no";
+    }
+    while ( $i < $commit_no ) 
     {
         mkdir "$to/commit.$i" ;
         foreach $file ( glob "$from/commit.$i/*" )
@@ -558,7 +570,7 @@ sub copy_state
     }
     copy "$from/log.txt", "$to/log.txt";
     mkdir "$to/index";
-    foreach $file ( glob "$from/index/*" ) 
+    foreach my $file ( glob "$from/index/*" ) 
     {
         $file =~ m/^$from\/index\/(.+)$/g and
         copy "$file", "$to/index/$1";              
