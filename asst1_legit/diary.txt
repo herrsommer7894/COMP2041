@@ -9,3 +9,5 @@ Date     Start    Stop     Activity    Comments
 1/10     12am     3am      Coding      legit status draft 
 1/10     4pm      6pm      Debugging   legit status deletion not working, problem with compare function
 1/10     6pm      8pm      Coding      re-implemented rm error checking
+1/10     10:30pm  12am     Coding      legit branch started
+2/10     12am     1:30pm   Coding      legit checkout done

@@ -13,11 +13,11 @@ elsif ($ARGV[0] eq "init")
     mkdir ".legit" or print STDERR "legit.pl: error: .legit already exists\n" and exit 1;
     print "Initialized empty legit repository in .legit\n";
     open F, ">", ".legit/branches" or die;
-    print F "master";
+    print F "master\n";
     close F;
     # Setup for initial master branch
     mkdir ".legit/branch.master" or die;
-    open F, ">", ".legit/master" or die;
+    open F, ">", ".legit/master.branch" or die;
     close F;
 
 } 
@@ -411,7 +411,7 @@ elsif ($ARGV[0] eq "branch")
             $#ARGV == 2 or print STDERR "legit.pl: error: branch name required\n" and exit 1;
             # Update track of current branch list
             $m == 1 and $file = $ARGV[2];
-            $m == 2 and $file = $ARGV[1];a
+            $m == 2 and $file = $ARGV[1];
             $file eq "master" and print STDERR "legit.pl: error: can not delete branch 'master'\n" and exit 1;
             open F, "<", ".legit/branches" or die;
             @arr = <F>;
@@ -424,7 +424,8 @@ elsif ($ARGV[0] eq "branch")
             close F;
             $branch_dir = ".legit/branch.$file";
             -d $branch_dir or print STDERR "legit.pl: error: branch '$file' does not exist\n" and exit 1;
-            #remove_tree($branch_dir);
+            rmtree($branch_dir);
+            
         }
         else 
         {
@@ -434,18 +435,9 @@ elsif ($ARGV[0] eq "branch")
             open F, ">>", ".legit/branches" or die;
             print F "$branch_name\n";
             close F;
-            # Create the new branch, copy current state into branch.<branchname>, including the index
+            # Create the new branch, copy current state into branch.<branchname>, including the index and log.txt
             mkdir "$branch_dir" or print STDERR "legit.pl: error: branch '$branch_name' already exists\n" and exit 1;
-            $i = 0;
-            while ( $i < next_commit_num() ) 
-            {
-                mkdir "$branch_dir/commit.$i" or die;
-                $i++;
-            }
-
-
-            
-            
+            copy_state(".legit", "$branch_dir");
 
         }
     }
@@ -456,10 +448,30 @@ elsif ($ARGV[0] eq "branch")
     $#ARGV == 1 or print STDERR "usage: legit.pl branch [-d] <branch>\n" and exit 1;
     $branch_name = $ARGV[1];
     # Check if such branch exists
-    
-
-    # Save all contents of current branch, then switch to the required branch
-
+    $branch_dir = ".legit/branch.$branch_name";
+    -d $branch_dir or print STDERR "legit.pl: error: unknown branch '$branch_name'\n" and exit 1;
+    # Save all contents of current branch
+    foreach $file ( glob ".legit/*" )
+    {
+        $file =~ /^\.legit\/(.+)\.branch$/ and
+        $curr_branch = $1 and last;
+    }
+    print "$curr_branch\n";
+    copy_state( ".legit", ".legit/branch.$curr_branch" );
+    # Switch to new branch
+    unlink ".legit/$curr_branch.branch";
+    open F, ">", "$branch_name.branch";
+    close F;
+    # remove everything from .legit and replace it with appropriate branch
+    $i = 0;
+    while ( $i < next_commit_num() ) 
+    {
+        rmtree(".legit/commit.$i");
+    }
+    unlink ".legit/log.txt";
+    rmtree(".legit/index");
+    copy_state("$branch_dir", ".legit");
+    print "Switched to branch '$branch_name'\n";
 
 }
 else 
@@ -527,4 +539,28 @@ sub next_commit_num
         $commit_dir = ".legit/commit.$commit_no";
     }
     return $commit_no;
+}
+
+sub copy_state 
+{
+    my ($from, $to) = @_;
+
+    $i = 0;
+    while ( $i < next_commit_num() ) 
+    {
+        mkdir "$to/commit.$i" ;
+        foreach $file ( glob "$from/commit.$i/*" )
+        {
+            $file =~ m/^$from\/commit\.$i\/(.+)$/g and
+            copy "$file", "$to/commit.$i/$1";
+        }
+        $i++;
+    }
+    copy "$from/log.txt", "$to/log.txt";
+    mkdir "$to/index";
+    foreach $file ( glob "$from/index/*" ) 
+    {
+        $file =~ m/^$from\/index\/(.+)$/g and
+        copy "$file", "$to/index/$1";              
+    }
 }
