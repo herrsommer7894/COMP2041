@@ -1,5 +1,8 @@
 #!/usr/bin/perl -w
 
+use File::Copy;
+use File::Path;
+
 if (scalar @ARGV == 0) 
 {
     print_usage();
@@ -9,6 +12,13 @@ elsif ($ARGV[0] eq "init")
     # Create an empty Legit repo. Error if already exists
     mkdir ".legit" or print STDERR "legit.pl: error: .legit already exists\n" and exit 1;
     print "Initialized empty legit repository in .legit\n";
+    open F, ">", ".legit/branches" or die;
+    print F "master";
+    close F;
+    # Setup for initial master branch
+    mkdir ".legit/branch.master" or die;
+    open F, ">", ".legit/master" or die;
+    close F;
 
 } 
 elsif ($ARGV[0] eq "add") 
@@ -91,10 +101,10 @@ elsif ($ARGV[0] eq "commit")
             close F;
         }
     }
-    $commit = 1; # Assume we do need to commit
+    # Assume we do need to commit
+    $commit = 1;
     $commit_no = next_commit_num();
     $commit_message = $ARGV[$m+1];
-    #print "Commit $commit_no message is $commit_message\n";
     # Save a copy of all files in the index to the repo or print "Nothing to commit" if index hasn't changed compared to prev commit
     if ($commit_no > 0) 
     {
@@ -211,6 +221,9 @@ elsif ($ARGV[0] eq "commit")
 } 
 elsif ($ARGV[0] eq "rm") 
 { 
+    # first check if all named files are in the repo (latest commit)
+    $curr_commit = next_commit_num() - 1;
+    $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet\n" and exit 1;
     ($#ARGV > 0) or print STDERR "usage: legit.pl rm [--force] [--cached] filenames\n" and exit 1;
     $i = 1;
     $is_forced = 0;
@@ -221,9 +234,6 @@ elsif ($ARGV[0] eq "rm")
         $ARGV[$i] eq "--cached" and $is_cached = 1;
         $i++;
     }
-    # first check if all named files are in the repo (latest commit)
-    $curr_commit = next_commit_num() - 1;
-    $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet\n" and exit 1;
     $commit_dir = ".legit/commit.$curr_commit";
     $index_dir = ".legit/index";
     $i = 1;
@@ -368,6 +378,90 @@ elsif ($ARGV[0] eq "status")
     }
 
 } 
+# If no arguments supplied, show current branch name
+# Don't need to account for deletion of currently checked out branch
+elsif ($ARGV[0] eq "branch") 
+{
+    $curr_commit = next_commit_num() - 1;
+    $curr_commit >= 0 or print STDERR "legit.pl: error: your repository does not have any commits yet\n" and exit 1;
+    $#ARGV < 3 or print STDERR "usage: legit.pl branch [-d] <branch>\n" and exit 1;
+    # Print list of current branch in alphabetical order
+    if ($#ARGV == 0) 
+    {
+        open F, "<", ".legit/branches" or die;
+        @arr = <F>;
+        close F;
+        foreach $branch (sort { $a cmp $b } @arr) 
+        {
+            print "$branch";
+        }
+    } 
+    else
+    {
+        # Check for -d option
+        $delete = 0;
+        $m = 1;
+        while ($m <= $#ARGV) 
+        {
+            $ARGV[$m] eq "-d" and $delete = 1 and last; 
+            $m++;
+        }
+        if ($delete) 
+        {
+            $#ARGV == 2 or print STDERR "legit.pl: error: branch name required\n" and exit 1;
+            # Update track of current branch list
+            $m == 1 and $file = $ARGV[2];
+            $m == 2 and $file = $ARGV[1];a
+            $file eq "master" and print STDERR "legit.pl: error: can not delete branch 'master'\n" and exit 1;
+            open F, "<", ".legit/branches" or die;
+            @arr = <F>;
+            close F;
+            open F, ">", ".legit/branches" or die;
+            foreach $line (@arr) 
+            {
+                "$line" ne "$file\n" and print F "$line";
+            }
+            close F;
+            $branch_dir = ".legit/branch.$file";
+            -d $branch_dir or print STDERR "legit.pl: error: branch '$file' does not exist\n" and exit 1;
+            #remove_tree($branch_dir);
+        }
+        else 
+        {
+            # Add new branch to list
+            $branch_name = $ARGV[1];
+            $branch_dir = ".legit/branch.$branch_name";
+            open F, ">>", ".legit/branches" or die;
+            print F "$branch_name\n";
+            close F;
+            # Create the new branch, copy current state into branch.<branchname>, including the index
+            mkdir "$branch_dir" or print STDERR "legit.pl: error: branch '$branch_name' already exists\n" and exit 1;
+            $i = 0;
+            while ( $i < next_commit_num() ) 
+            {
+                mkdir "$branch_dir/commit.$i" or die;
+                $i++;
+            }
+
+
+            
+            
+
+        }
+    }
+
+
+} elsif ($ARGV[0] eq "checkout") 
+{
+    $#ARGV == 1 or print STDERR "usage: legit.pl branch [-d] <branch>\n" and exit 1;
+    $branch_name = $ARGV[1];
+    # Check if such branch exists
+    
+
+    # Save all contents of current branch, then switch to the required branch
+
+
+}
 else 
 {
     print STDERR "legit.pl: error: unknown command $ARGV[0]\n";
