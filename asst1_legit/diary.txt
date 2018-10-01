@@ -4,4 +4,8 @@ Date     Start    Stop     Activity    Comments
 26/09    10pm     12am     Coding      legit add done
 27/09    9pm      10pm     Debugging   legit commit usage checks
 28/09    10pm     12am     Coding      legit commit -m done
-29/09    4pmm     6pm      COding      legit show done
+29/09    4pm      6pm      Coding      legit show done
+30/09    8pm      12am     Coding      legit remove done
+1/10     12am     3am      Coding      legit status draft 
+1/10     4pm      6pm      Debugging   legit status deletion not working, problem with compare function
+
